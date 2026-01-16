@@ -1,0 +1,56 @@
+
+
+CONTEXT SWİTCH 
+
+~~Valla mecbur manuel context switch yapıcaz gibi~~
+Rolling Window mantıgı uygun gibi 
+
+~~Silmesi gerektiği yerde silmezse sıkıntı, silmemesi gerektiği yerde silerse daha da sıkıntı~~
+
+-Silme işini kaldırıyoruz o yüzden silmeme bize sadece latency ve token kaybı olarak geliyor, token kaybı evet sıkıntı 
+ama rolling windowla silincek tokenler zaten önceki contexte bağlı olucak yani zaten onların silinmesi iyi bir durum
+önceki mesajların context windowda kalması cok da büyük bir sorun değil. 
+
+-RAG verisi öncelikli olucak çünkü geçmiş bağlamsız verilerle dolu olabilir RAG'a göre yer doluysa geçmiş contextten budama 
+
+-En güvenilir yöntem ek LLM çağırısı gibi ama bütçemiz her response'da ek LLM cagırısı yapmaya maalesef yetmez
+
+-Onun dışında en mantıklısı vektör karşılaştırma gibi ama o da cok güvenilir değil 
+
+-Vektör karşılaştırmalı hibrit bir model çıkartabiliriz ama yine success rate'i çok yüksek olmaz gibi
+
+-Token bar ekleyelim hem debugging hem de context windowun durumunu görmek için baya önemli
+
+RAG VERİSİ SEÇME
+
+Valla sıkıntı 
+-Context Windowumuz dar oldugu için (~4000 token) bir istemde cok fazla RAG verisi çağıramayız (~3)
+
+-Konudan konuya RAG dosya sayısı limiti arttırılıp azaltılabilir düşük token sayılı RAG'larda (User bilgileri kısa bilgiler) 
+gibi RAG'dan gelen dosya sayısı arttırabilir ama ordan attırmak da Message'a ayırdıgımız tokeni azaltıcak onun ayarı tutturulmalı
+
+-Kod problemleri gibi hem cok token harcayan RAG'larda iyice dikkatli olmak lazım bence burdaki asıl mesele Aiyo'nun yapamadıgı
+işleri RAG sistemine kaydetmek kendi başına çözebileceği konularda ek RAG istemi gereksiz ve zararlı olur. Bu sebeplerden dolayı
+kod modunda RAG'a giren bilgileri manuel kayıt yapabiliriz.
+
+-Bilgi kalitesi kontrolünde en mantıklı yöntem şuan 20 tane mesaj çekip rerankerla ranklayıp ~3 tanesini prompta eklemek gibi.
+
+-Yine LLM çağırısı yapabilsek çok daha iyi seçimler yapılabilirdi ama maalesef bütçe.
+
+-Kod konularındaki RAG'lara manuel kayıt yapılıcaksa importance metadatası eklenebilir bu sayede çok sıkıntılı bilinen
+promptlarda işimize yarayacak RAG'ların gelme şansını arttırabiliriz. 
+
+-Gelen dosya sayısını limitlemek yerine token limiti koyulabilir hem dosya sayısını manuel değiştirmemize gerek kalmaz 
+3 küçük dosya cagırma ya da 3 büyük dosya cagırma durumlarında sıkıntı olmaz 
+
+-Promptta gelen bilgiyi yok sayma hakkını verebiliriz eğer yanlışlıkla aradan RAG kaçsa bile en azından outputa olan etkisini
+belki sınırlayabiliriz
+
+-RAG'dan user naber gibi sohbet etme eğilimindeyse verileri biraz randomnessla cagırabiliriz bu sayede RAGdan sürekli en 
+alakalı diye tek veri gelicekken her seferinde farklı veri gelir ve sohbet havası korunur
+
+-RAG'a JSON formatında bilgi kaydetmek çok daha iyi gibi 
+<MEMORY_OP> { "action": "save", "content_summary": "Python ile asenkron dosya okuma fonksiyonu",
+"tags": ["python", "asyncio", "file-io"], "importance": 8 } </MEMORY_OP>"
+
+-Çağırırken çok daha verimli bilgileri cagırabiliriz 
