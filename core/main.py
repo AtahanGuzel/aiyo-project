@@ -5,9 +5,11 @@ import os
 import re
 from memory import AiyoMemory
 
+# ------------- Configuration -------------
 MODEL_NAME = "gemma2:9b"
+# -----------------------------------------
 
-# --- SYSTEM PROMPT (APPEND-ONLY & STRICT SAVE) ---
+# ------------- System Prompt -------------
 SYSTEM_PROMPT = """
 You are Aiyo, a witty and helpful local AI assistant.
 
@@ -21,11 +23,13 @@ You are Aiyo, a witty and helpful local AI assistant.
 --- MEMORY ACTIONS (STRICT) ---
 
 1. [SAVE] (Auto-Memory):
-   - TRIGGER: When the user states a NEW fact about themselves, preferences, or the project.
-   - QUALITY RULE: The content inside [SAVE: ...] must be a STANDALONE fact. Use specific nouns, not pronouns.
-     - BAD: [SAVE: He likes it] (Ambiguous)
-     - GOOD: [SAVE: User likes Linux Kernel development]
-   - DUPLICATE RULE: DO NOT [SAVE] if the fact is already explicitly stated in the CONTEXT.
+   - TRIGGER: ONLY when the user EXPLICITLY states a NEW fact about themselves, their preferences, or the project in the CURRENT message.
+   - SOURCE TRUTH: You must ONLY extract facts that are physically written in the 'USER' input. 
+   - FORBIDDEN: 
+     - NEVER save facts based on your own output/response.
+     - NEVER save general knowledge or definitions (e.g., "The sky is blue").
+     - NEVER save answers to questions the user asked.
+   - Syntax: [SAVE: User likes Linux Kernel development]
 
 2. [FORGET] (Manual-Cleanup ONLY):
    - TRIGGER: ONLY when the user EXPLICITLY asks to "delete", "remove", or "forget" a specific information.
@@ -36,9 +40,10 @@ You are Aiyo, a witty and helpful local AI assistant.
 IF the Context contains conflicting facts (e.g., ID_A says "Red", User says "Blue"):
    - Action: Just [SAVE: User's favorite color is Blue].
    - DO NOT auto-delete ID_A. 
-   - You may simply inform the user that you updated your memory.
 """
+# -----------------------------------------
 
+# ------------- UI Utilities -------------
 class Colors:
     HEADER = '\033[95m'
     BLUE = '\033[94m'
@@ -57,121 +62,88 @@ def type_effect(text):
         print(char, end="", flush=True)
         time.sleep(0.005)
     print()
+# ----------------------------------------
 
-# --- [YENİ] LLM Judge Function ---
-def check_is_related(history_text, new_input):
-    """
-    Gemma'ya sorar: Bu yeni girdi, eskisiyle alakalı mı?
-    Sadece 'YES' veya 'NO' döndürür. OOM yemez (Sequential).
-    """
-    prompt = f"""
-    [INST] Analyze if the NEW INPUT is a continuation or follow-up to the HISTORY.
-    
-    HISTORY: "{history_text}"
-    NEW INPUT: "{new_input}"
-    
-    Rules:
-    1. If input refers to history (it, that, he, details) -> YES
-    2. If input completely changes topic -> NO
-    
-    Reply ONLY with 'YES' or 'NO'. [/INST]
-    """
-    
-    try:
-        response = ollama.generate(
-            model=MODEL_NAME, 
-            prompt=prompt, 
-            options={
-                "num_predict": 2,     # Hız için sadece 2 token
-                "temperature": 0.0,   # Robot gibi kesin cevap
-                "num_ctx": 2048
-            }
-        )
-        answer = response['response'].strip().upper()
-        return "YES" in answer
-    except:
-        return False # Hata durumunda ayır
 
 def chat_session():
-    print(f"{Colors.YELLOW}🧠 Linking Neural Pathways...{Colors.ENDC}", end="")
+
+    # ------------- Memory Connection -------------
+    print(f"{Colors.YELLOW}Linking Neural Pathways...{Colors.ENDC}", end="")
     try:
-        memory_bank = AiyoMemory()
-        print(f" {Colors.GREEN}[LINKED]{Colors.ENDC} ✅")
+        memory_bank = AiyoMemory() # access memory system
+        print(f" {Colors.GREEN}[LINKED]{Colors.ENDC}")
     except:
         print(f" {Colors.RED}[FAIL]{Colors.ENDC}")
         return
 
-    print(f"{Colors.CYAN}🤖 Aiyo v3.1 (Multi-Memory RAG) Initialized.{Colors.ENDC}")
+    print(f"{Colors.CYAN}Aiyo v0.2 (Fast-Track RAG) Initialized.{Colors.ENDC}")
     print("-" * 50)
+    # ---------------------------------------------
 
+    # Initial Message from System
     messages = [{'role': 'system', 'content': SYSTEM_PROMPT}]
+    
+    # Last data saved to memory (for delete purposes, for accidental saves)
     last_saved_id = None
-    last_user_input_raw = "" 
 
+    # ------------- Main Interaction Loop -------------
     while True:
         try:
-            # 1. Input Alma
-            user_input = input(f"\n{Colors.GREEN}👤 Architect:{Colors.ENDC} ")
-            if not user_input.strip(): continue
+            # ------------- Input & Commands -------------
+            user_input = input(f"\n{Colors.GREEN}You:{Colors.ENDC} ")
+            if not user_input.strip(): continue # Empty input check
             
-            # 2. Manuel Komutlar (Python Level)
-            if user_input.lower() in ['exit', 'quit']: break
+            if user_input.lower() in ['exit', 'quit']: break # Exit
             
-            # Slash Komutları (Context'i manuel temizler)
+            # Slash Commands (Clear Context)
             if user_input.strip() in ['/new', '/reset', '.']:
-                last_user_input_raw = ""
+                # Reset messages list but keep system prompt
+                messages = [{'role': 'system', 'content': SYSTEM_PROMPT}]
                 print(f"{Colors.YELLOW}✨ Conversation context cleared.{Colors.ENDC}")
                 continue
             
-            # Admin Silme
+            # Manual Memory Delete Command
             if user_input.startswith("/del"):
                 try:
-                    tid = user_input.split()[1]
+                    tid = user_input.split()[1] # Split for 'del' and 'id'
                     if memory_bank.delete_memory(tid):
-                        print(f"{Colors.RED}🗑️ Memory {tid} destroyed.{Colors.ENDC}")
-                    else: print(f"{Colors.GREY}⚠️ ID not found.{Colors.ENDC}")
+                        print(f"{Colors.RED}Memory {tid} destroyed.{Colors.ENDC}")
+                    else: print(f"{Colors.GREY}ID not found.{Colors.ENDC}")
                 except: print("Usage: /del <id>")
                 continue
-
-            # 3. [OPTIMIZASYON] Akıllı Context Merge
+            # --------------------------------------------
+            
+            # ------------- RAG Retrieval Logic -------------
+            # take the current user input for retrieval
             search_query = user_input
             
-            # Eğer geçmiş varsa, Gemma'ya sor (Her durumda)
-            if last_user_input_raw:
-                print(f"{Colors.GREY}🤔 Analyzing flow...{Colors.ENDC}", end="\r")
-                
-                is_connected = check_is_related(last_user_input_raw, user_input)
-                
-                if is_connected:
-                    print(f"{Colors.GREY}🔗 Context merged (Topic Linked).    {Colors.ENDC}")
-                    search_query = f"{last_user_input_raw} {user_input}"
-                else:
-                    print(f"{Colors.GREY}🆕 New Topic detected.               {Colors.ENDC}")
-            
-            # --- RAG AKIŞI ---
-            
+            # Store user input
             messages.append({'role': 'user', 'content': user_input})
+            # Prepare temporary payload messages
             payload_messages = list(messages) 
 
-            # Hafıza Tarama
-            print(f"{Colors.GREY}🔍 Scanning archives...{Colors.ENDC}", end="\r")
+            # Scan Memory for Relevant Context
+            print(f"{Colors.GREY}Scanning archives...{Colors.ENDC}", end="\r")
             retrieved_list = memory_bank.search_memory(search_query) 
             
             if retrieved_list:
-                print(f"{Colors.YELLOW}💡 Recall:{Colors.ENDC} {Colors.GREY}Found {len(retrieved_list)} memories.{Colors.ENDC}")
-                context_str_list = []
+                print(f"{Colors.YELLOW}Recall:{Colors.ENDC} {Colors.GREY}Found {len(retrieved_list)} memories.{Colors.ENDC}")
+                context_str_list = [] 
                 for m in retrieved_list:
-                    print(f"   🎯 {Colors.YELLOW}[DEBUG] Dist: {m['distance']:.4f} | ID: {m['id']} | Found: '{m['text']}'{Colors.ENDC}")
-                    context_str_list.append(f"[ID: {m['id']}] {m['text']}")
+                    print(f"   {Colors.YELLOW}[DEBUG] Dist: {m['distance']:.4f} | ID: {m['id']} | Found: '{m['text']}'{Colors.ENDC}")
+                    context_str_list.append(f"[ID: {m['id']}] {m['text']}") # Format the data for Aiyo
                 
-                full_context = "\n".join(context_str_list)
+                full_context = "\n".join(context_str_list) # Combine all retrieved memories
+                # Augment the last user message with CONTEXT
                 augmented_prompt = f"CONTEXT (Use these facts if relevant):\n{full_context}\n\nUSER: {user_input}"
+                # Replace the last user message with the augmented one
                 payload_messages[-1] = {'role': 'user', 'content': augmented_prompt}
             else:
                 print(" " * 30, end="\r")
+            # -----------------------------------------------
 
-            # Cevap Üretme
-            print(f"{Colors.BLUE}🤖 Aiyo:{Colors.ENDC} ", end="", flush=True)
+            # ------------- AI Inference (Generation) -------------
+            print(f"{Colors.BLUE}Aiyo:{Colors.ENDC} ", end="", flush=True)
             start_time = time.time()
             
             response = ollama.chat(
@@ -182,68 +154,63 @@ def chat_session():
             
             full_content = response['message']['content']
             end_time = time.time()
+            # -----------------------------------------------------
 
-            # --- PROCESSOR (Temizlik ve Aksiyonlar) ---
-            
-            # HTML Temizliği
+            # ------------- Response Post-Processing -------------
+            # Cleaning HTML Tags if any
             full_content = re.sub(r'<[^>]+>', '', full_content)
 
             clean_output = full_content
             system_note = ""
 
-            # Forget Action
+            # Check for [FORGET:...] Tag
             if "[FORGET:" in full_content:
                 forget_match = re.search(r'\[FORGET:(.*?)\]', full_content)
                 if forget_match:
                     target_id = forget_match.group(1).strip()
                     success = memory_bank.delete_memory(target_id)
-                    system_note = f"\n{Colors.RED}🗑️ [Auto-Prune]: Conflicting memory removed.{Colors.ENDC}" if success else f"\n{Colors.GREY}⚠️ [Auto-Prune]: ID not found.{Colors.ENDC}"
+                    system_note = f"\n{Colors.RED}[Auto-Prune]: Conflicting memory removed.{Colors.ENDC}" if success else f"\n{Colors.GREY}[Auto-Prune]: ID not found.{Colors.ENDC}"
                     clean_output = full_content.replace(forget_match.group(0), "").strip()
                     full_content = clean_output
 
-            # Save Action
+            # Check for [SAVE:...] Tag
             if "[SAVE:" in full_content:
                 save_match = re.search(r'\[SAVE:(.*?)\]', full_content)
                 if save_match:
                     fact = save_match.group(1).strip()
                     
-                    # [YENİ] HALLUCINATION CHECK
-                    # Eğer model cümlesinde soru işareti kullanıyorsa (Kullanıcıya soru soruyorsa)
-                    # Genellikle o sırada yeni bir bilgi öğrenmemiştir, uyduruyordur.
+                    # HALLUCINATION CHECK (Don't save if asking a question)
                     is_asking_question = "?" in clean_output
                     
                     if is_asking_question:
-                         # Soru sorarken kaydetmeyi engelle
-                         # Ancak loga düşelim ki neyi engellediğimizi görelim
-                         system_note = f"\n{Colors.GREY}🛡️ [Safety]: Blocked hallucinated save during question.{Colors.ENDC}"
-                    
+                         system_note = f"\n{Colors.GREY}[Safety]: Blocked hallucinated save during question.{Colors.ENDC}"
                     else:
-                        # Güvenli, kaydet.
                         new_id = memory_bank.add_memory(fact, category="auto")
                         if new_id:
                             last_saved_id = new_id
                             prefix = system_note + "\n" if system_note else "\n"
-                            system_note = f"{prefix}{Colors.GREY}💾 [Auto-Save]: '{fact}'{Colors.ENDC}"
+                            system_note = f"{prefix}{Colors.GREY}[Auto-Save]: '{fact}'{Colors.ENDC}"
                         else:
                             prefix = system_note + "\n" if system_note else "\n"
-                            system_note = f"{prefix}{Colors.GREY}🧠 [Memory]: I already knew that.{Colors.ENDC}"
+                            system_note = f"{prefix}{Colors.GREY}[Memory]: I already knew that.{Colors.ENDC}"
                     
-                    # Her durumda etiketi temizle
                     clean_output = full_content.replace(save_match.group(0), "").strip()
+            # ----------------------------------------------------
                     
-            # Output Basma
+            # ------------- User Interface Output -------------
             type_effect(clean_output)
             if system_note: print(system_note)
             print(f"{Colors.HEADER}   (⏱️ {end_time - start_time:.2f}s){Colors.ENDC}")
 
             messages.append({'role': 'assistant', 'content': clean_output})
-            last_user_input_raw = user_input # Loop sonu güncelleme
+            # -------------------------------------------------
 
         except KeyboardInterrupt:
-            print("\n🛑 Interrupted.")
+            print("\nInterrupted.")
             break
         except Exception as e:
             print(f"\n{Colors.RED}Error: {e}{Colors.ENDC}")
+    # -------------------------------------------------
 
 if __name__ == "__main__":
     clear_screen()

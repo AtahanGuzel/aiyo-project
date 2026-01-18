@@ -1,0 +1,20 @@
+PHASE 1 - Core & Memory - :
+
+- 1.1: Input Filtering :
+
+    - Hangi bilgiyi kaydetmesi gerektiğini öğret
+    - Yanlış bilgileri kaydetmesini engelle 
+    - Kaydettiğin bilgileri düzgün formatla
+
+- 1.2: Retrieval System
+
+    - Databasei filtrele, getirdiğin sonuçları tekrar filtrele 
+    - Anlamsız bilgileri getirme 
+
+PHASE 2 - Function Calling & Basic Tools - :
+
+PHASE 3 - Interface & Interaction - :
+
+PHASE 4 - Agentic Behavior & Advanced Tools - :
+
+PHASE 4 - Optimization - : 
