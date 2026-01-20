@@ -51,12 +51,22 @@ class AiyoMemory:
 
     def delete_memory(self, doc_id):
         try:
+            # ÖNCE KONTROL ET: Bu ID veritabanında var mı?
+            existing = self.collection.get(ids=[doc_id])
+            
+            # Eğer ID bulunamazsa (ids listesi boşsa) False döndür
+            if not existing['ids']:
+                print(f"Delete Error: ID '{doc_id}' not found in DB.")
+                return False
+
+            # Varsa sil
             self.collection.delete(ids=[doc_id])
             return True
-        except:
+        except Exception as e:
+            print(f"Delete Exception: {e}")
             return False
-
-    def search_memory(self, query, n_results=5):
+            
+    def search_memory(self, query, n_results=3):
         try:
             results = self.collection.query(
                 query_texts=[query], 
@@ -65,15 +75,21 @@ class AiyoMemory:
         
             found_memories = []
             if results['documents']:
-                for i in range(len(results['documents'][0])):
+                count = len(results['documents'][0])
+                
+                for i in range(count):
                     distance = results['distances'][0][i]
                     text = results['documents'][0][i]
                     doc_id = results['ids'][0][i]
                 
-                    # [DEĞİŞİKLİK] Eşik değerini (1.4) GEÇİCİ OLARAK KALDIRIYORUZ.
-                    # Neden gelmediğini görmek için her şeyi (mesafesi 2.0 olsa bile) getirsin.
-                    # if distance < 1.4:  <-- Yorum satırı yap veya sil
-                    found_memories.append({"id": doc_id, "text": text, "distance": distance})
+                    # BURADA FİLTRE YOK!
+                    # 1.4, 1.8, 2.5... Ne bulursa hepsini listeye ekliyor.
+                    # Böylece main dosyasında hepsini ekrana basıp görebileceksin.
+                    found_memories.append({
+                        "id": doc_id, 
+                        "text": text, 
+                        "distance": distance
+                    })
         
             return found_memories 
         except Exception as e:

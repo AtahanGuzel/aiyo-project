@@ -5,6 +5,7 @@ PHASE 1 - Core & Memory - :
     - Hangi bilgiyi kaydetmesi gerektiğini öğret
     - Yanlış bilgileri kaydetmesini engelle 
     - Kaydettiğin bilgileri düzgün formatla
+    - Düzenli aralıklarla tüm bilgileri gözden geçirtip çıkarımlar yaptır ve yeni bilgiler eklet
 
 - 1.2: Retrieval System
 
@@ -17,4 +18,4 @@ PHASE 3 - Interface & Interaction - :
 
 PHASE 4 - Agentic Behavior & Advanced Tools - :
 
-PHASE 4 - Optimization - : 
+PHASE 5 - Optimization - : 

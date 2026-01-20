@@ -1,0 +1,37 @@
+You: Do you know what is the food i dislike most?
+Recall: Found 1 memories.
+   [DEBUG] Dist: 1.1662 | ID: ba1c5948-c247-4163-94ad-0331960615e1 | Found: 'Atahan's favorite food is Pizza'
+Aiyo: My memory tells me that you love pizza,  🍕 [ID: ba1c5948-c247-4163-94ad-0331960615e1] 
+
+But I don't have information about your least favorite food. 🤔 What's the food you dislike most, Atahan?
+   (⏱️ 4.08s)
+
+
+
+
+ou: I really like omelett what can i eat beside omlett
+💡 Recall (Top 3):es...
+    [DEBUG] Dist: 1.2200 | ID: ba1c5948-c247-4163-94ad-0331960615e1 | Found: 'Atahan's favorite food is Pizza'
+    [DEBUG] Dist: 1.4812 | ID: 281b4713-bbf5-43e2-98cf-9bb475a27198 | Found: 'Atahan dislikes hamburgers.'
+    [DEBUG] Dist: 1.7170 | ID: 7e8bd7a4-198e-4c2f-930a-8ae30175d0a3 | Found: 'User lives in Istanbul'
+Aiyo: You said you like omelettes, that's great!  Since your favorite food is pizza (remembering from our past conversation), maybe you could try some other breakfast-y foods like: 
+
+* Waffles with fruit and syrup
+* Pancakes with whipped cream and chocolate chips
+* French toast with powdered sugar
+
+
+Let me know if you want more ideas!
+   (⏱️ 3.83s)
+
+You: I also like cheese
+💡 Recall (Top 3):es...
+    [DEBUG] Dist: 1.2626 | ID: ba1c5948-c247-4163-94ad-0331960615e1 | Found: 'Atahan's favorite food is Pizza'
+    [DEBUG] Dist: 1.4915 | ID: 3b4d8b86-9af4-43c0-a63e-802c0baea2e4 | Found: 'User's favorite color is Red'
+    [DEBUG] Dist: 1.5743 | ID: 281b4713-bbf5-43e2-98cf-9bb475a27198 | Found: 'Atahan dislikes hamburgers.'
+Aiyo: That's awesome!  Cheese goes well with so many things. Do you have a favorite type of cheese? 🧀
+
+[Auto-Save]: 'User likes Cheese'
+   (⏱️ 2.06s)
+
+You:
